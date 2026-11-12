@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recuperación de horas</title>
+<style>
+  :root {
+    --bg: #f5f6f8; --card: #ffffff; --text: #1d2330; --muted: #667085;
+    --border: #dfe3ea; --accent: #2457d6; --ok: #127a3d; --warn: #b4321f;
+    --ok-bg: #e6f4ec; --warn-bg: #fbe9e6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #12151b; --card: #1b2029; --text: #e8ebf1; --muted: #98a2b3;
+      --border: #2c3340; --accent: #7aa2ff; --ok: #5fd08f; --warn: #ff8a75;
+      --ok-bg: #16301f; --warn-bg: #3a1c17;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border);
+    border-radius: 12px; padding: 16px; margin-bottom: 16px;
+  }
+  .day {
+    display: grid; gap: 10px 14px; align-items: center;
+    grid-template-columns: 110px repeat(2, minmax(110px, 1fr)) 1.6fr 90px;
+    padding: 12px 0; border-bottom: 1px solid var(--border);
+  }
+  .day:last-child { border-bottom: 0; }
+  .name { font-weight: 600; }
+  .name small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; }
+  label.f { display: flex; flex-direction: column; font-size: .8rem; color: var(--muted); gap: 3px; }
+  input[type=time] {
+    font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; width: 100%;
+  }
+  .checks { display: flex; flex-direction: column; gap: 4px; font-size: .88rem; }
+  .checks label { display: flex; gap: 6px; align-items: flex-start; cursor: pointer; }
+  .checks input { margin-top: 3px; }
+  .worked { text-align: right; font-variant-numeric: tabular-nums; }
+  .worked b { display: block; font-size: 1.05rem; }
+  .worked span { font-size: .8rem; }
+  .pos { color: var(--ok); } .neg { color: var(--warn); }
+  .day.off input[type=time] { opacity: .4; }
+  .err { grid-column: 1 / -1; color: var(--warn); font-size: .85rem; }
+  .result { text-align: center; padding: 22px 16px; }
+  .result.debe { background: var(--warn-bg); border-color: transparent; }
+  .result.ok { background: var(--ok-bg); border-color: transparent; }
+  .big { font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0; }
+  .result p { margin: 4px 0; }
+  .totals { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap;
+            color: var(--muted); font-size: .9rem; margin-top: 10px; }
+  .totals b { color: var(--text); font-variant-numeric: tabular-nums; }
+  .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
+  button {
+    font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--text);
+    padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  }
+  button:hover { border-color: var(--accent); }
+  .note { color: var(--muted); font-size: .85rem; }
+  @media (max-width: 720px) {
+    .day { grid-template-columns: 1fr 1fr; }
+    .name { grid-column: 1 / -1; }
+    .checks { grid-column: 1 / -1; }
+    .worked { grid-column: 1 / -1; text-align: left; display: flex; gap: 10px; align-items: baseline; }
+    .worked b { display: inline; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Recuperación de horas</h1>
+  <p class="sub">Horario: lunes a jueves 09:00–13:00 y 15:00–19:00 · viernes 08:00–16:00 (40 h semanales).</p>
+
+  <section class="card" id="days"></section>
+
+  <section class="card result" id="result" aria-live="polite"></section>
+
+  <div class="actions">
+    <button type="button" id="reset">Restablecer horario estándar</button>
+  </div>
+
+  <p class="note">
+    Cómo se calcula: de lunes a jueves cuenta todo el tiempo entre entrada y salida, salvo la franja
+    13:00–15:00, que solo cuenta si se marca «Comió en la oficina». El viernes cuenta desde la entrada
+    hasta las 16:00. Las horas de más un día compensan las de menos de otro. Un día marcado como
+    festivo o ausencia justificada no se exige ni se suma. La diferencia hasta las horas exigidas es lo
+    que hay que recuperar el viernes a partir de las 16:00.
+  </p>
+</main>
+
+<script>
+const DAYS = [
+  { id: "lun", name: "Lunes",     friday: false },
+  { id: "mar", name: "Martes",    friday: false },
+  { id: "mie", name: "Miércoles", friday: false },
+  { id: "jue", name: "Jueves",    friday: false },
+  { id: "vie", name: "Viernes",   friday: true  },
+];
+const LUNCH = [13 * 60, 15 * 60];
+const EXPECTED_MT = 8 * 60;   // 09-13 + 15-19
+const EXPECTED_FRI = 8 * 60;  // 08-16
+const FRI_END = 16 * 60;
+const STORE_KEY = "horario-recuperacion-v1";
+
+const defaults = () => Object.fromEntries(DAYS.map(d => [d.id, d.friday
+  ? { in: "08:00", off: false }
+  : { in: "09:00", out: "19:00", lunch: false, off: false }]));
+
+let state = load();
+
+function load() {
+  try {
+    const s = JSON.parse(localStorage.getItem(STORE_KEY));
+    if (s && DAYS.every(d => s[d.id])) return s;
+  } catch (e) {}
+  return defaults();
+}
+function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) {} }
+
+const toMin = t => { if (!t) return null; const [h, m] = t.split(":").map(Number); return h * 60 + m; };
+const overlap = (a1, a2, b1, b2) => Math.max(0, Math.min(a2, b2) - Math.max(a1, b1));
+function fmt(min, signed = false) {
+  const sign = min < 0 ? "−" : (signed && min > 0 ? "+" : "");
+  const a = Math.abs(Math.round(min));
+  return `${sign}${Math.floor(a / 60)} h ${String(a % 60).padStart(2, "0")} min`;
+}
+const clock = min => `${String(Math.floor(min / 60) % 24).padStart(2, "0")}:${String(min % 60).padStart(2, "0")}`;
+
+function compute(d) {
+  const s = state[d.id];
+  const expected = s.off ? 0 : (d.friday ? EXPECTED_FRI : EXPECTED_MT);
+  if (s.off) return { expected, worked: 0, error: null };
+  const a = toMin(s.in);
+  const b = d.friday ? FRI_END : toMin(s.out);
+  if (a == null || b == null) return { expected, worked: 0, error: "Indica la hora de entrada" + (d.friday ? "." : " y de salida.") };
+  if (b <= a) return { expected, worked: 0, error: d.friday
+    ? "La entrada del viernes debe ser anterior a las 16:00."
+    : "La salida debe ser posterior a la entrada." };
+  let worked = b - a;
+  if (!d.friday && !s.lunch) worked -= overlap(a, b, LUNCH[0], LUNCH[1]);
+  return { expected, worked, error: null };
+}
+
+function renderDays() {
+  const box = document.getElementById("days");
+  box.innerHTML = DAYS.map(d => {
+    const s = state[d.id];
+    const times = d.friday
+      ? `<label class="f">Entrada<input type="time" data-k="in" value="${s.in}"></label>
+         <label class="f">Salida<input type="time" value="16:00" disabled title="Se calcula hasta las 16:00"></label>`
+      : `<label class="f">Entrada<input type="time" data-k="in" value="${s.in}"></label>
+         <label class="f">Salida<input type="time" data-k="out" value="${s.out}"></label>`;
+    const checks = `<div class="checks">
+        ${d.friday ? "" : `<label><input type="checkbox" data-k="lunch" ${s.lunch ? "checked" : ""}>
+          Comió en la oficina (13:00–15:00 cuenta como trabajo)</label>`}
+        <label><input type="checkbox" data-k="off" ${s.off ? "checked" : ""}> Festivo / ausencia justificada</label>
+      </div>`;
+    return `<div class="day${s.off ? " off" : ""}" data-day="${d.id}">
+        <div class="name">${d.name}<small>${d.friday ? "08:00–16:00" : "09–13 · 15–19"}</small></div>
+        ${times}${checks}
+        <div class="worked"><b data-o="worked"></b><span data-o="diff"></span></div>
+        <div class="err" data-o="err" hidden></div>
+      </div>`;
+  }).join("");
+
+  box.querySelectorAll("input[data-k]").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const row = e.target.closest(".day"); const id = row.dataset.day; const k = e.target.dataset.k;
+      state[id][k] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
+      if (k === "off") row.classList.toggle("off", e.target.checked);
+      row.querySelectorAll("input[type=time][data-k]").forEach(t => t.disabled = state[id].off);
+      save(); update();
+    });
+  });
+  DAYS.forEach(d => { if (state[d.id].off)
+    box.querySelectorAll(`[data-day=${d.id}] input[type=time][data-k]`).forEach(t => t.disabled = true); });
+  update();
+}
+
+function update() {
+  let totalExp = 0, totalWorked = 0, errors = 0;
+  DAYS.forEach(d => {
+    const r = compute(d);
+    const row = document.querySelector(`[data-day=${d.id}]`);
+    const err = row.querySelector("[data-o=err]");
+    err.hidden = !r.error; err.textContent = r.error || "";
+    if (r.error) errors++;
+    totalExp += r.expected; totalWorked += r.worked;
+    const diff = r.worked - r.expected;
+    row.querySelector("[data-o=worked]").textContent = state[d.id].off ? "—" : fmt(r.worked);
+    const ds = row.querySelector("[data-o=diff]");
+    ds.textContent = state[d.id].off ? "no computa" : (diff === 0 ? "en hora" : fmt(diff, true));
+    ds.className = diff > 0 ? "pos" : diff < 0 ? "neg" : "";
+  });
+
+  const res = document.getElementById("result");
+  const pending = totalExp - totalWorked;
+  const totals = `<div class="totals">
+      <span>Exigidas: <b>${fmt(totalExp)}</b></span>
+      <span>Trabajadas: <b>${fmt(totalWorked)}</b></span>
+      <span>Saldo: <b class="${pending > 0 ? "neg" : "pos"}">${fmt(-pending, true)}</b></span>
+    </div>`;
+  if (errors) {
+    res.className = "card result";
+    res.innerHTML = `<p>Revisa los días marcados para obtener el resultado.</p>${totals}`;
+  } else if (pending > 0) {
+    res.className = "card result debe";
+    res.innerHTML = `<p>Debe recuperar el viernes después de las 16:00</p>
+      <div class="big">${fmt(pending)}</div>
+      <p>Hora de salida del viernes: <b>${state.vie.off ? "—" : clock(FRI_END + pending)}</b></p>${totals}`;
+  } else {
+    res.className = "card result ok";
+    res.innerHTML = `<p>No tiene horas que recuperar el viernes</p>
+      <div class="big">0 h 00 min</div>
+      <p>${pending < 0 ? `Lleva ${fmt(-pending)} de más esta semana.` : "Puede salir a las 16:00."}</p>${totals}`;
+  }
+}
+
+document.getElementById("reset").addEventListener("click", () => { state = defaults(); save(); renderDays(); });
+renderDays();
+</script>
+</body>
+</html>
