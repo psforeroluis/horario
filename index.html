@@ -4,106 +4,201 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Recuperación de horas</title>
+<meta name="description" content="Calcula cuántas horas hay que recuperar el viernes después de las 16:00.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
   :root {
-    --bg: #f5f6f8; --card: #ffffff; --text: #1d2330; --muted: #667085;
-    --border: #dfe3ea; --accent: #2457d6; --ok: #127a3d; --warn: #b4321f;
-    --ok-bg: #e6f4ec; --warn-bg: #fbe9e6;
+    --bg: #f4f5fb; --bg2: #e9ecfb;
+    --card: rgba(255,255,255,.78); --card-solid: #fff;
+    --text: #0f1222; --muted: #6b7088; --border: rgba(15,18,34,.08);
+    --field: #f3f4f9; --accent: #5b5bf6; --accent2: #a855f7;
+    --ok: #0e9f6e; --warn: #e5484d; --ok-soft: rgba(14,159,110,.12); --warn-soft: rgba(229,72,77,.12);
+    --shadow: 0 1px 2px rgba(15,18,34,.04), 0 8px 24px rgba(15,18,34,.06);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #12151b; --card: #1b2029; --text: #e8ebf1; --muted: #98a2b3;
-      --border: #2c3340; --accent: #7aa2ff; --ok: #5fd08f; --warn: #ff8a75;
-      --ok-bg: #16301f; --warn-bg: #3a1c17;
+      --bg: #0b0d17; --bg2: #141833;
+      --card: rgba(24,27,44,.72); --card-solid: #181b2c;
+      --text: #eef0fa; --muted: #9096b3; --border: rgba(255,255,255,.08);
+      --field: rgba(255,255,255,.05); --accent: #8b8bff; --accent2: #c084fc;
+      --ok: #3dd68c; --warn: #ff6b70; --ok-soft: rgba(61,214,140,.14); --warn-soft: rgba(255,107,112,.14);
+      --shadow: 0 1px 2px rgba(0,0,0,.3), 0 12px 32px rgba(0,0,0,.35);
     }
   }
   * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
   body {
-    margin: 0; background: var(--bg); color: var(--text);
-    font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    margin: 0; min-height: 100vh; color: var(--text);
+    font: 15px/1.5 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background:
+      radial-gradient(900px 500px at 10% -10%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 60%),
+      radial-gradient(800px 500px at 100% 0%, color-mix(in srgb, var(--accent2) 18%, transparent), transparent 60%),
+      linear-gradient(180deg, var(--bg2), var(--bg) 420px);
+    background-color: var(--bg);
   }
-  main { max-width: 860px; margin: 0 auto; padding: 24px 16px 48px; }
-  h1 { font-size: 1.5rem; margin: 0 0 4px; }
-  .sub { color: var(--muted); margin: 0 0 20px; }
+  main { max-width: 1100px; margin: 0 auto; padding: 40px 16px 56px; }
+
+  header { margin-bottom: 28px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px; padding: 5px 12px; border-radius: 999px;
+    background: var(--card); border: 1px solid var(--border); font-size: .8rem; font-weight: 500;
+    color: var(--muted); backdrop-filter: blur(10px);
+  }
+  .badge i { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  h1 {
+    font-size: clamp(2rem, 5vw, 3rem); line-height: 1.05; letter-spacing: -.035em; font-weight: 800;
+    margin: 14px 0 10px;
+  }
+  h1 span { background: linear-gradient(135deg, var(--accent), var(--accent2)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .sub { color: var(--muted); margin: 0; font-size: 1rem; max-width: 620px; }
+
+  .layout { display: grid; grid-template-columns: 1fr 360px; gap: 20px; align-items: start; }
+
   .card {
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 16px; margin-bottom: 16px;
+    background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+    box-shadow: var(--shadow); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   }
-  .day {
-    display: grid; gap: 10px 14px; align-items: center;
-    grid-template-columns: 110px repeat(2, minmax(110px, 1fr)) 1.6fr 90px;
-    padding: 12px 0; border-bottom: 1px solid var(--border);
+  .days { display: grid; gap: 12px; }
+  .day { padding: 18px; transition: opacity .2s, transform .2s; }
+  .day-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+  .day-title { display: flex; align-items: center; gap: 12px; }
+  .dot {
+    width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center;
+    font-weight: 700; font-size: .85rem; color: #fff;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
   }
-  .day:last-child { border-bottom: 0; }
-  .name { font-weight: 600; }
-  .name small { display: block; font-weight: 400; color: var(--muted); font-size: .8rem; }
-  label.f { display: flex; flex-direction: column; font-size: .8rem; color: var(--muted); gap: 3px; }
+  .day-title b { display: block; font-size: 1rem; letter-spacing: -.01em; }
+  .day-title small { color: var(--muted); font-size: .8rem; }
+  .chip {
+    font-variant-numeric: tabular-nums; font-weight: 600; font-size: .82rem;
+    padding: 5px 10px; border-radius: 999px; background: var(--field); color: var(--muted); white-space: nowrap;
+  }
+  .chip.pos { background: var(--ok-soft); color: var(--ok); }
+  .chip.neg { background: var(--warn-soft); color: var(--warn); }
+
+  .day-body { display: grid; grid-template-columns: 1fr 1fr 1.25fr; gap: 12px; align-items: end; }
+  .field { display: flex; flex-direction: column; gap: 6px; font-size: .75rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
   input[type=time] {
-    font: inherit; color: var(--text); background: var(--bg);
-    border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; width: 100%;
+    font: 600 1.05rem Inter, system-ui, sans-serif; color: var(--text); font-variant-numeric: tabular-nums;
+    background: var(--field); border: 1px solid transparent; border-radius: 12px; padding: 10px 12px; width: 100%;
+    outline: none; transition: border-color .15s, box-shadow .15s;
+    color-scheme: light dark;
   }
-  .checks { display: flex; flex-direction: column; gap: 4px; font-size: .88rem; }
-  .checks label { display: flex; gap: 6px; align-items: flex-start; cursor: pointer; }
-  .checks input { margin-top: 3px; }
-  .worked { text-align: right; font-variant-numeric: tabular-nums; }
-  .worked b { display: block; font-size: 1.05rem; }
-  .worked span { font-size: .8rem; }
-  .pos { color: var(--ok); } .neg { color: var(--warn); }
-  .day.off input[type=time] { opacity: .4; }
-  .err { grid-column: 1 / -1; color: var(--warn); font-size: .85rem; }
-  .result { text-align: center; padding: 22px 16px; }
-  .result.debe { background: var(--warn-bg); border-color: transparent; }
-  .result.ok { background: var(--ok-bg); border-color: transparent; }
-  .big { font-size: 2.4rem; font-weight: 700; font-variant-numeric: tabular-nums; margin: 4px 0; }
-  .result p { margin: 4px 0; }
-  .totals { display: flex; justify-content: center; gap: 24px; flex-wrap: wrap;
-            color: var(--muted); font-size: .9rem; margin-top: 10px; }
-  .totals b { color: var(--text); font-variant-numeric: tabular-nums; }
-  .actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-  button {
-    font: inherit; border: 1px solid var(--border); background: var(--card); color: var(--text);
-    padding: 7px 14px; border-radius: 8px; cursor: pointer;
+  input[type=time]:focus { border-color: var(--accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--accent) 20%, transparent); }
+  input[type=time]:disabled { opacity: .5; }
+  .worked { text-align: right; }
+  .worked .lbl { font-size: .75rem; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+  .worked .val { font-size: 1.35rem; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+
+  .toggles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+  .toggle {
+    position: relative; display: inline-flex; align-items: center; gap: 10px; cursor: pointer; user-select: none;
+    padding: 8px 12px 8px 8px; border-radius: 12px; background: var(--field); border: 1px solid transparent;
+    font-size: .86rem; font-weight: 500; transition: border-color .15s, background .15s;
   }
-  button:hover { border-color: var(--accent); }
-  .note { color: var(--muted); font-size: .85rem; }
-  @media (max-width: 720px) {
-    .day { grid-template-columns: 1fr 1fr; }
-    .name { grid-column: 1 / -1; }
-    .checks { grid-column: 1 / -1; }
-    .worked { grid-column: 1 / -1; text-align: left; display: flex; gap: 10px; align-items: baseline; }
-    .worked b { display: inline; }
+  .toggle input { position: absolute; opacity: 0; pointer-events: none; }
+  .toggle .sw {
+    width: 34px; height: 20px; border-radius: 999px; background: color-mix(in srgb, var(--muted) 35%, transparent);
+    position: relative; transition: background .2s; flex: none;
+  }
+  .toggle .sw::after {
+    content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+    background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s;
+  }
+  .toggle input:checked + .sw { background: linear-gradient(135deg, var(--accent), var(--accent2)); }
+  .toggle input:checked + .sw::after { transform: translateX(14px); }
+  .toggle:has(input:checked) { border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+  .toggle input:focus-visible + .sw { box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent); }
+  .toggle small { color: var(--muted); font-weight: 400; }
+
+  .day.off { opacity: .6; }
+  .err { margin-top: 10px; color: var(--warn); font-size: .85rem; font-weight: 500; }
+
+  aside { position: sticky; top: 20px; display: grid; gap: 12px; }
+  .result { padding: 24px; overflow: hidden; position: relative; }
+  .result::before {
+    content: ""; position: absolute; inset: 0; opacity: .14; pointer-events: none;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+  }
+  .result.ok::before { background: linear-gradient(135deg, var(--ok), #22c3a6); }
+  .result.debe::before { background: linear-gradient(135deg, var(--warn), #f97316); }
+  .result > * { position: relative; }
+  .r-label { font-size: .8rem; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .big { font-size: 3.2rem; font-weight: 800; letter-spacing: -.04em; line-height: 1.05; margin: 8px 0 6px; font-variant-numeric: tabular-nums; }
+  .big small { font-size: 1.2rem; font-weight: 600; color: var(--muted); letter-spacing: 0; margin-left: 2px; }
+  .r-note { color: var(--muted); margin: 0; }
+  .exit {
+    margin-top: 18px; display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-radius: 14px; background: var(--card-solid); border: 1px solid var(--border);
+  }
+  .exit span { color: var(--muted); font-size: .9rem; }
+  .exit b { font-size: 1.5rem; font-weight: 700; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+
+  .stats { padding: 20px; }
+  .bar { height: 10px; border-radius: 999px; background: var(--field); overflow: hidden; margin: 10px 0 16px; }
+  .bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent2)); transition: width .35s cubic-bezier(.2,.8,.2,1); }
+  .stat-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: .92rem; }
+  .stat-row span { color: var(--muted); }
+  .stat-row b { font-variant-numeric: tabular-nums; }
+  .stat-row b.pos { color: var(--ok); } .stat-row b.neg { color: var(--warn); }
+
+  button.reset {
+    width: 100%; font: 600 .92rem Inter, system-ui, sans-serif; color: var(--text); cursor: pointer;
+    padding: 12px; border-radius: 14px; background: var(--card); border: 1px solid var(--border);
+    backdrop-filter: blur(10px); transition: border-color .15s, transform .1s;
+  }
+  button.reset:hover { border-color: var(--accent); }
+  button.reset:active { transform: scale(.98); }
+
+  details.how { margin-top: 20px; padding: 16px 20px; }
+  details.how summary { cursor: pointer; font-weight: 600; }
+  details.how p { color: var(--muted); margin: 10px 0 0; font-size: .92rem; }
+
+  @media (max-width: 900px) {
+    .layout { grid-template-columns: 1fr; }
+    aside { position: static; order: -1; }
+  }
+  @media (max-width: 560px) {
+    main { padding-top: 28px; }
+    .day-body { grid-template-columns: 1fr 1fr; }
+    .worked { grid-column: 1 / -1; display: flex; justify-content: space-between; align-items: baseline; text-align: left; }
+    .big { font-size: 2.6rem; }
   }
 </style>
 </head>
 <body>
 <main>
-  <h1>Recuperación de horas</h1>
-  <p class="sub">Horario: lunes a jueves 09:00–13:00 y 15:00–19:00 · viernes 08:00–16:00 (40 h semanales).</p>
+  <header>
+    <span class="badge"><i></i>Lun–Jue 09–13 · 15–19 &nbsp;·&nbsp; Vie 08–16</span>
+    <h1>Recuperación de <span>horas</span></h1>
+    <p class="sub">Introduce la entrada y la salida de cada día y descubre cuánto tiempo hay que recuperar el viernes a partir de las 16:00.</p>
+  </header>
 
-  <section class="card" id="days"></section>
+  <div class="layout">
+    <section class="days" id="days"></section>
 
-  <section class="card result" id="result" aria-live="polite"></section>
-
-  <div class="actions">
-    <button type="button" id="reset">Restablecer horario estándar</button>
+    <aside>
+      <div class="card result" id="result" aria-live="polite"></div>
+      <div class="card stats" id="stats"></div>
+      <button type="button" class="reset" id="reset">Restablecer horario estándar</button>
+    </aside>
   </div>
 
-  <p class="note">
-    Cómo se calcula: de lunes a jueves cuenta todo el tiempo entre entrada y salida, salvo la franja
-    13:00–15:00, que solo cuenta si se marca «Comió en la oficina». El viernes cuenta desde la entrada
-    hasta las 16:00. Las horas de más un día compensan las de menos de otro. Un día marcado como
-    festivo o ausencia justificada no se exige ni se suma. La diferencia hasta las horas exigidas es lo
-    que hay que recuperar el viernes a partir de las 16:00.
-  </p>
+  <details class="card how">
+    <summary>¿Cómo se calcula?</summary>
+    <p>De lunes a jueves cuenta todo el tiempo entre la entrada y la salida, salvo la franja 13:00–15:00, que solo cuenta si se activa «Comió en la oficina». El viernes cuenta desde la entrada hasta las 16:00. Las horas de más de un día compensan las de menos de otro. Un día marcado como festivo o ausencia justificada no se exige ni se suma. Lo que falte hasta las horas exigidas es lo que hay que recuperar el viernes a partir de las 16:00. Los datos se guardan solo en este navegador.</p>
+  </details>
 </main>
 
 <script>
 const DAYS = [
-  { id: "lun", name: "Lunes",     friday: false },
-  { id: "mar", name: "Martes",    friday: false },
-  { id: "mie", name: "Miércoles", friday: false },
-  { id: "jue", name: "Jueves",    friday: false },
-  { id: "vie", name: "Viernes",   friday: true  },
+  { id: "lun", name: "Lunes",     short: "L", friday: false },
+  { id: "mar", name: "Martes",    short: "M", friday: false },
+  { id: "mie", name: "Miércoles", short: "X", friday: false },
+  { id: "jue", name: "Jueves",    short: "J", friday: false },
+  { id: "vie", name: "Viernes",   short: "V", friday: true  },
 ];
 const LUNCH = [13 * 60, 15 * 60];
 const EXPECTED_MT = 8 * 60;   // 09-13 + 15-19
@@ -150,26 +245,34 @@ function compute(d) {
   return { expected, worked, error: null };
 }
 
+const toggle = (k, checked, label, hint) => `
+  <label class="toggle"><input type="checkbox" data-k="${k}" ${checked ? "checked" : ""}><span class="sw"></span>
+    <span>${label}${hint ? ` <small>${hint}</small>` : ""}</span></label>`;
+
 function renderDays() {
   const box = document.getElementById("days");
   box.innerHTML = DAYS.map(d => {
     const s = state[d.id];
-    const times = d.friday
-      ? `<label class="f">Entrada<input type="time" data-k="in" value="${s.in}"></label>
-         <label class="f">Salida<input type="time" value="16:00" disabled title="Se calcula hasta las 16:00"></label>`
-      : `<label class="f">Entrada<input type="time" data-k="in" value="${s.in}"></label>
-         <label class="f">Salida<input type="time" data-k="out" value="${s.out}"></label>`;
-    const checks = `<div class="checks">
-        ${d.friday ? "" : `<label><input type="checkbox" data-k="lunch" ${s.lunch ? "checked" : ""}>
-          Comió en la oficina (13:00–15:00 cuenta como trabajo)</label>`}
-        <label><input type="checkbox" data-k="off" ${s.off ? "checked" : ""}> Festivo / ausencia justificada</label>
-      </div>`;
-    return `<div class="day${s.off ? " off" : ""}" data-day="${d.id}">
-        <div class="name">${d.name}<small>${d.friday ? "08:00–16:00" : "09–13 · 15–19"}</small></div>
-        ${times}${checks}
-        <div class="worked"><b data-o="worked"></b><span data-o="diff"></span></div>
+    const out = d.friday
+      ? `<label class="field">Salida<input type="time" value="16:00" disabled title="Se calcula hasta las 16:00"></label>`
+      : `<label class="field">Salida<input type="time" data-k="out" value="${s.out}"></label>`;
+    return `<article class="card day${s.off ? " off" : ""}" data-day="${d.id}">
+        <div class="day-head">
+          <div class="day-title"><div class="dot">${d.short}</div>
+            <div><b>${d.name}</b><small>${d.friday ? "08:00 – 16:00" : "09:00 – 13:00 · 15:00 – 19:00"}</small></div></div>
+          <span class="chip" data-o="diff"></span>
+        </div>
+        <div class="day-body">
+          <label class="field">Entrada<input type="time" data-k="in" value="${s.in}"></label>
+          ${out}
+          <div class="worked"><div class="lbl">Trabajado</div><div class="val" data-o="worked"></div></div>
+        </div>
+        <div class="toggles">
+          ${d.friday ? "" : toggle("lunch", s.lunch, "Comió en la oficina", "13–15 cuenta")}
+          ${toggle("off", s.off, "Festivo / ausencia")}
+        </div>
         <div class="err" data-o="err" hidden></div>
-      </div>`;
+      </article>`;
   }).join("");
 
   box.querySelectorAll("input[data-k]").forEach(inp => {
@@ -177,13 +280,15 @@ function renderDays() {
       const row = e.target.closest(".day"); const id = row.dataset.day; const k = e.target.dataset.k;
       state[id][k] = e.target.type === "checkbox" ? e.target.checked : e.target.value;
       if (k === "off") row.classList.toggle("off", e.target.checked);
-      row.querySelectorAll("input[type=time][data-k]").forEach(t => t.disabled = state[id].off);
+      syncDisabled(row, id);
       save(); update();
     });
   });
-  DAYS.forEach(d => { if (state[d.id].off)
-    box.querySelectorAll(`[data-day=${d.id}] input[type=time][data-k]`).forEach(t => t.disabled = true); });
+  DAYS.forEach(d => syncDisabled(box.querySelector(`[data-day=${d.id}]`), d.id));
   update();
+}
+function syncDisabled(row, id) {
+  row.querySelectorAll("input[type=time][data-k], input[data-k=lunch]").forEach(t => t.disabled = state[id].off);
 }
 
 function update() {
@@ -196,33 +301,43 @@ function update() {
     if (r.error) errors++;
     totalExp += r.expected; totalWorked += r.worked;
     const diff = r.worked - r.expected;
-    row.querySelector("[data-o=worked]").textContent = state[d.id].off ? "—" : fmt(r.worked);
-    const ds = row.querySelector("[data-o=diff]");
-    ds.textContent = state[d.id].off ? "no computa" : (diff === 0 ? "en hora" : fmt(diff, true));
-    ds.className = diff > 0 ? "pos" : diff < 0 ? "neg" : "";
+    const off = state[d.id].off;
+    row.querySelector("[data-o=worked]").textContent = off ? "—" : fmt(r.worked);
+    const chip = row.querySelector("[data-o=diff]");
+    chip.textContent = off ? "No computa" : r.error ? "Revisar" : diff === 0 ? "En hora" : fmt(diff, true);
+    chip.className = "chip" + (off ? "" : r.error ? " neg" : diff > 0 ? " pos" : diff < 0 ? " neg" : "");
   });
 
-  const res = document.getElementById("result");
   const pending = totalExp - totalWorked;
-  const totals = `<div class="totals">
-      <span>Exigidas: <b>${fmt(totalExp)}</b></span>
-      <span>Trabajadas: <b>${fmt(totalWorked)}</b></span>
-      <span>Saldo: <b class="${pending > 0 ? "neg" : "pos"}">${fmt(-pending, true)}</b></span>
-    </div>`;
+  const res = document.getElementById("result");
+  const hm = m => { const a = Math.max(0, Math.round(m)); return `${Math.floor(a / 60)}<small>h</small> ${String(a % 60).padStart(2, "0")}<small>min</small>`; };
+
   if (errors) {
     res.className = "card result";
-    res.innerHTML = `<p>Revisa los días marcados para obtener el resultado.</p>${totals}`;
+    res.innerHTML = `<div class="r-label">Resultado</div><div class="big">—</div>
+      <p class="r-note">Revisa los días marcados para obtener el resultado.</p>`;
   } else if (pending > 0) {
     res.className = "card result debe";
-    res.innerHTML = `<p>Debe recuperar el viernes después de las 16:00</p>
-      <div class="big">${fmt(pending)}</div>
-      <p>Hora de salida del viernes: <b>${state.vie.off ? "—" : clock(FRI_END + pending)}</b></p>${totals}`;
+    res.innerHTML = `<div class="r-label">A recuperar el viernes</div>
+      <div class="big">${hm(pending)}</div>
+      <p class="r-note">después de las 16:00</p>
+      <div class="exit"><span>Salida del viernes</span><b>${state.vie.off ? "—" : clock(FRI_END + pending)}</b></div>`;
   } else {
     res.className = "card result ok";
-    res.innerHTML = `<p>No tiene horas que recuperar el viernes</p>
-      <div class="big">0 h 00 min</div>
-      <p>${pending < 0 ? `Lleva ${fmt(-pending)} de más esta semana.` : "Puede salir a las 16:00."}</p>${totals}`;
+    res.innerHTML = `<div class="r-label">A recuperar el viernes</div>
+      <div class="big">${hm(0)}</div>
+      <p class="r-note">${pending < 0 ? `Lleva ${fmt(-pending)} de más esta semana.` : "Semana completa."}</p>
+      <div class="exit"><span>Salida del viernes</span><b>${state.vie.off ? "—" : "16:00"}</b></div>`;
   }
+
+  const pct = totalExp ? Math.min(100, totalWorked / totalExp * 100) : 100;
+  const bal = totalWorked - totalExp;
+  document.getElementById("stats").innerHTML = `
+    <div class="r-label">Semana</div>
+    <div class="bar"><i style="width:${pct}%"></i></div>
+    <div class="stat-row"><span>Exigidas</span><b>${fmt(totalExp)}</b></div>
+    <div class="stat-row"><span>Trabajadas</span><b>${fmt(totalWorked)}</b></div>
+    <div class="stat-row"><span>Saldo</span><b class="${bal > 0 ? "pos" : bal < 0 ? "neg" : ""}">${bal === 0 ? "0 h 00 min" : fmt(bal, true)}</b></div>`;
 }
 
 document.getElementById("reset").addEventListener("click", () => { state = defaults(); save(); renderDays(); });
